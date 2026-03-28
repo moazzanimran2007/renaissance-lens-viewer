@@ -6,7 +6,7 @@ import FigureThread from "./FigureThread";
 import AudioWalkthrough from "./AudioWalkthrough";
 import { useAudioWalkthrough } from "@/hooks/useAudioWalkthrough";
 import { useTTSVoices } from "@/hooks/useTTSVoices";
-import { Loader2, Crosshair } from "lucide-react";
+import { Loader2, MousePointerSquareDashed } from "lucide-react";
 import { toast } from "sonner";
 
 interface PaintingViewProps {
@@ -15,81 +15,142 @@ interface PaintingViewProps {
   onReset: () => void;
 }
 
+interface SelectionRect {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
+
+function normalizeRect(r: SelectionRect) {
+  return {
+    x1: Math.min(r.startX, r.endX),
+    y1: Math.min(r.startY, r.endY),
+    x2: Math.max(r.startX, r.endX),
+    y2: Math.max(r.startY, r.endY),
+  };
+}
+
 const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
   const [selectedFigureIndex, setSelectedFigureIndex] = useState<number | null>(null);
   const [customFigure, setCustomFigure] = useState<Figure | null>(null);
-  const [customClickPos, setCustomClickPos] = useState<{ x: number; y: number } | null>(null);
   const [isAnalyzingRegion, setIsAnalyzingRegion] = useState(false);
+  const [selection, setSelection] = useState<SelectionRect | null>(null);
+  const [confirmedSelection, setConfirmedSelection] = useState<SelectionRect | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
   const { voices, selectedVoice, setSelectedVoice } = useTTSVoices();
   const walkthrough = useAudioWalkthrough(analysis, selectedVoice);
 
-  const handleImageClick = useCallback(
-    async (e: React.MouseEvent<HTMLDivElement>) => {
-      // Don't trigger if clicking on a marker button
+  const getPercentPos = useCallback((e: React.MouseEvent) => {
+    const rect = imgRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)),
+      y: Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)),
+    };
+  }, []);
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
       if ((e.target as HTMLElement).closest("button")) return;
+      const pos = getPercentPos(e);
+      setSelection({ startX: pos.x, startY: pos.y, endX: pos.x, endY: pos.y });
+      setIsDragging(true);
+      setConfirmedSelection(null);
+      setCustomFigure(null);
+    },
+    [getPercentPos]
+  );
 
-      const rect = imgRef.current?.getBoundingClientRect();
-      if (!rect) return;
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!isDragging || !selection) return;
+      const pos = getPercentPos(e);
+      setSelection((prev) => prev ? { ...prev, endX: pos.x, endY: pos.y } : null);
+    },
+    [isDragging, selection, getPercentPos]
+  );
 
-      const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-      const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+  const handleMouseUp = useCallback(async () => {
+    if (!isDragging || !selection) return;
+    setIsDragging(false);
 
-      setCustomClickPos({ x, y });
-      setSelectedFigureIndex(null);
-      setIsAnalyzingRegion(true);
+    const norm = normalizeRect(selection);
+    const width = norm.x2 - norm.x1;
+    const height = norm.y2 - norm.y1;
 
-      try {
-        // Convert image to base64 for the edge function
+    // Ignore tiny selections (accidental clicks)
+    if (width < 3 && height < 3) {
+      setSelection(null);
+      return;
+    }
+
+    setConfirmedSelection(selection);
+    setSelectedFigureIndex(null);
+    setIsAnalyzingRegion(true);
+
+    const centerX = Math.round((norm.x1 + norm.x2) / 2);
+    const centerY = Math.round((norm.y1 + norm.y2) / 2);
+
+    try {
+      // Use the imageUrl directly — it's already a data URL or blob URL from the upload
+      let base64 = imageUrl;
+      if (!imageUrl.startsWith("data:")) {
         const response = await fetch(imageUrl);
         const blob = await response.blob();
-        const base64 = await new Promise<string>((resolve) => {
+        base64 = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.readAsDataURL(blob);
         });
-
-        const { data, error } = await supabase.functions.invoke("analyze-region", {
-          body: {
-            image: base64,
-            x,
-            y,
-            paintingTitle: analysis.title,
-            paintingArtist: analysis.artist,
-          },
-        });
-
-        if (error) throw error;
-        if (!data || data.error) throw new Error(data?.error || "Analysis failed");
-
-        const figure: Figure = {
-          label: data.label,
-          description: data.description,
-          biography: data.biography,
-          isRealPerson: data.isRealPerson,
-          position: { x, y },
-        };
-
-        setCustomFigure(figure);
-      } catch (err: any) {
-        console.error("Region analysis error:", err);
-        toast.error("Could not analyze that area. Try again.");
-        setCustomClickPos(null);
-      } finally {
-        setIsAnalyzingRegion(false);
       }
-    },
-    [imageUrl, analysis.title, analysis.artist]
-  );
+
+      const { data, error } = await supabase.functions.invoke("analyze-region", {
+        body: {
+          image: base64,
+          x: centerX,
+          y: centerY,
+          regionBounds: { x1: Math.round(norm.x1), y1: Math.round(norm.y1), x2: Math.round(norm.x2), y2: Math.round(norm.y2) },
+          paintingTitle: analysis.title,
+          paintingArtist: analysis.artist,
+        },
+      });
+
+      if (error) throw error;
+      if (!data || data.error) throw new Error(data?.error || "Analysis failed");
+
+      const figure: Figure = {
+        label: data.label,
+        description: data.description,
+        biography: data.biography,
+        isRealPerson: data.isRealPerson,
+        position: { x: centerX, y: centerY },
+      };
+
+      setCustomFigure(figure);
+    } catch (err: any) {
+      console.error("Region analysis error:", err);
+      toast.error("Could not analyze that area. Try again.");
+      setConfirmedSelection(null);
+      setSelection(null);
+    } finally {
+      setIsAnalyzingRegion(false);
+    }
+  }, [isDragging, selection, imageUrl, analysis.title, analysis.artist]);
 
   const closeCustomFigure = useCallback(() => {
     setCustomFigure(null);
-    setCustomClickPos(null);
+    setConfirmedSelection(null);
+    setSelection(null);
   }, []);
 
-  // Show either a pre-identified figure or a custom-selected one
   const activeFigure = selectedFigureIndex !== null ? analysis.figures[selectedFigureIndex] : customFigure;
   const isCustom = selectedFigureIndex === null && customFigure !== null;
+
+  // Rectangle to render (during drag or after confirmation)
+  const visibleRect = isDragging ? selection : confirmedSelection;
+  const normRect = visibleRect ? normalizeRect(visibleRect) : null;
 
   return (
     <div className="min-h-screen parchment-texture">
@@ -101,21 +162,27 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
           {analysis.artist} · {analysis.date}
         </p>
         <p className="font-body text-muted-foreground mt-1 text-xs flex items-center justify-center gap-1">
-          <Crosshair className="w-3 h-3" />
-          Click anywhere on the painting to analyze that area
+          <MousePointerSquareDashed className="w-3 h-3" />
+          Click &amp; drag on the painting to select an area to analyze
         </p>
       </header>
 
       <div className="flex justify-center px-4 mb-12">
         <div
           ref={imgRef}
-          className="relative inline-block max-w-[80vw] cursor-crosshair"
-          onClick={handleImageClick}
+          className="relative inline-block max-w-[80vw] cursor-crosshair select-none"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={() => {
+            if (isDragging) handleMouseUp();
+          }}
         >
           <img
             src={imageUrl}
             alt={analysis.title}
-            className="w-full h-auto rounded gold-border"
+            className="w-full h-auto rounded gold-border pointer-events-none"
+            draggable={false}
           />
           {analysis.figures.map((figure, i) => (
             <FigureMarker
@@ -123,26 +190,29 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
               figure={figure}
               onClick={() => {
                 setCustomFigure(null);
-                setCustomClickPos(null);
+                setConfirmedSelection(null);
+                setSelection(null);
                 setSelectedFigureIndex(i);
               }}
               isActive={walkthrough.activeFigureIndex === i}
             />
           ))}
-          {/* Custom click marker */}
-          {customClickPos && (
+
+          {/* Selection rectangle */}
+          {normRect && (
             <div
-              className="absolute pointer-events-none"
+              className="absolute border-2 border-gold/70 bg-gold/10 rounded-sm pointer-events-none transition-none"
               style={{
-                left: `${customClickPos.x}%`,
-                top: `${customClickPos.y}%`,
-                transform: "translate(-50%, -50%)",
+                left: `${normRect.x1}%`,
+                top: `${normRect.y1}%`,
+                width: `${normRect.x2 - normRect.x1}%`,
+                height: `${normRect.y2 - normRect.y1}%`,
               }}
             >
-              {isAnalyzingRegion ? (
-                <Loader2 className="w-6 h-6 text-gold animate-spin" />
-              ) : (
-                <span className="block w-[18px] h-[18px] rounded-full border-2 border-parchment bg-accent animate-pulse-gold" />
+              {isAnalyzingRegion && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-gold animate-spin" />
+                </div>
               )}
             </div>
           )}
@@ -177,11 +247,8 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
         <FigureThread
           figure={activeFigure}
           onClose={() => {
-            if (isCustom) {
-              closeCustomFigure();
-            } else {
-              setSelectedFigureIndex(null);
-            }
+            if (isCustom) closeCustomFigure();
+            else setSelectedFigureIndex(null);
           }}
           voice={selectedVoice}
           voices={voices}
