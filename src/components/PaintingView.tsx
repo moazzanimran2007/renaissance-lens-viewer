@@ -94,24 +94,15 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
     const centerY = Math.round((norm.y1 + norm.y2) / 2);
 
     try {
-      // Use the imageUrl directly — it's already a data URL or blob URL from the upload
-      let base64 = imageUrl;
-      if (!imageUrl.startsWith("data:")) {
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      }
+      // Crop the selected region from the image and send only that portion
+      const croppedBase64 = await cropImageRegion(imageUrl, norm);
 
       const { data, error } = await supabase.functions.invoke("analyze-region", {
         body: {
-          image: base64,
-          x: centerX,
-          y: centerY,
-          regionBounds: { x1: Math.round(norm.x1), y1: Math.round(norm.y1), x2: Math.round(norm.x2), y2: Math.round(norm.y2) },
+          image: croppedBase64,
+          x: 50,
+          y: 50,
+          regionBounds: { x1: 0, y1: 0, x2: 100, y2: 100 },
           paintingTitle: analysis.title,
           paintingArtist: analysis.artist,
         },
