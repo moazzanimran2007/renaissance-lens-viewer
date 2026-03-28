@@ -1,45 +1,83 @@
 
 
-## Single Story + Q&A in Figure Thread (Still Using Assistant UI)
+## Painting History & Related Works Discovery
 
-Yes, we'll still use Assistant UI — but instead of drip-feeding messages one by one, the full story appears as a single assistant message. Then a text input appears so you can ask follow-up questions.
+### What You'll Get
 
-### Changes
+1. **Painting Gallery** — Every painting you analyze gets saved. You can revisit any past analysis from a gallery page.
+2. **Related Paintings** — After analysis, a "Related Works" section shows AI-suggested famous paintings connected by the same artist, era, subject matter, or artistic influence. These are art-historical recommendations, not limited to your uploads.
 
-**1. New edge function: `supabase/functions/figure-chat/index.ts`**
-- Accepts `{ messages, figureContext }` (label, description, biography, isRealPerson)
-- System prompt: Renaissance art scholar persona with the figure's full context baked in
-- Streams response via SSE using Lovable AI gateway (`google/gemini-3-flash-preview`)
-- Handles 429/402 errors
+---
 
-**2. Rewrite `src/components/FigureThread.tsx`**
-- On mount, show ONE assistant message containing the full story: intro line + historical/allegorical note + full biography — all in one message, rendered as multiple paragraphs
-- No staggered reveal, no 400ms timers — everything appears immediately
-- After the story message, enable the Assistant UI Composer (text input) with placeholder "Ask about {label}..."
-- When user submits a question: append user message to thread, call `figure-chat` edge function with streaming, stream AI response as a new assistant message
-- Keep `useExternalStoreRuntime` but manage messages array manually (pre-populated story + user/AI exchanges)
-- Keep TTS controls in header (unchanged)
-- Keep QuillAvatar, slide-in panel, parchment styling
+### Technical Plan
 
-**3. Update `ThreadContent`**
-- Show `UserMessage` component (simple styled bubble) instead of `() => null`
-- Show Composer component with parchment-themed input styling
-- Composer hidden until story is loaded (brief moment)
+**1. Database: `paintings` table**
 
-**4. Style additions in `src/index.css`**
-- User message bubble: slightly different background from assistant
-- Composer input: gold border, parchment background, matching font
-
-### Flow
-```text
-1. Click figure dot → panel slides in
-2. Full story appears as one assistant message (immediate, no drip)
-3. Text input visible at bottom: "Ask about Jesus..."
-4. User types question → user message appears → AI streams scholarly answer
-5. Conversation continues, full history sent each time
+```sql
+CREATE TABLE paintings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  artist TEXT NOT NULL,
+  date TEXT,
+  painting_overview TEXT,
+  figures JSONB,
+  image_path TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+-- Public read, no auth required (no user accounts in this app)
+ALTER TABLE paintings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can read paintings" ON paintings FOR SELECT USING (true);
+CREATE POLICY "Anyone can insert paintings" ON paintings FOR INSERT WITH CHECK (true);
 ```
 
+**2. Storage: `paintings` bucket (public)**
+
+Store uploaded images. Public bucket so images can be displayed directly via URL.
+
+**3. Save on analysis success (`src/pages/Index.tsx`)**
+
+After `analyze-painting` returns successfully:
+- Upload the image file to the `paintings` storage bucket
+- Insert a row into the `paintings` table with title, artist, date, overview, figures JSON, and the storage path
+- Store the resulting `id` so we can link to it
+
+**4. Gallery page (`src/pages/Gallery.tsx`)**
+
+- Grid of painting thumbnails with title + artist overlay
+- Click any card → navigates to `/painting/:id` which loads from DB and renders `PaintingView`
+- Parchment-themed cards with gold borders matching existing design
+
+**5. Painting detail route (`src/pages/Painting.tsx`)**
+
+- Route `/painting/:id` — loads painting data from DB, constructs image URL from storage, renders `PaintingView`
+
+**6. Related Works section**
+
+- New edge function `supabase/functions/suggest-related/index.ts`
+  - Takes `{ title, artist, date, paintingOverview }` 
+  - AI prompt asks for 4-6 famous related paintings with: title, artist, year, a 2-sentence description of why it's related, and a relationship tag (same artist / same era / same subject / artistic influence)
+  - Uses tool calling for structured output
+- New component `src/components/RelatedWorks.tsx`
+  - Displayed below "About This Work" on the result page
+  - Cards showing title, artist, year, relationship tag, and reason
+  - Called automatically after analysis completes (non-blocking)
+
+**7. Navigation**
+
+- Add a small "Gallery" link in the upload screen header and the painting view header
+- Add route `/gallery` in `App.tsx`
+
 ### Files
-- **New:** `supabase/functions/figure-chat/index.ts`
-- **Modified:** `src/components/FigureThread.tsx`, `src/index.css`
+
+| Action | File |
+|--------|------|
+| Migration | `paintings` table + storage bucket + RLS |
+| New | `supabase/functions/suggest-related/index.ts` |
+| New | `src/pages/Gallery.tsx` |
+| New | `src/pages/Painting.tsx` |
+| New | `src/components/RelatedWorks.tsx` |
+| Modified | `src/pages/Index.tsx` — save after analysis |
+| Modified | `src/components/PaintingView.tsx` — add RelatedWorks + Gallery link |
+| Modified | `src/components/UploadScreen.tsx` — add Gallery link |
+| Modified | `src/App.tsx` — add routes |
 
