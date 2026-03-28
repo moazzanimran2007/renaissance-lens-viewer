@@ -31,6 +31,32 @@ function normalizeRect(r: SelectionRect) {
   };
 }
 
+/** Crop the selected region from the image and return as base64 data URL */
+async function cropImageRegion(
+  imageUrl: string,
+  region: { x1: number; y1: number; x2: number; y2: number }
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const sx = (region.x1 / 100) * img.naturalWidth;
+      const sy = (region.y1 / 100) * img.naturalHeight;
+      const sw = ((region.x2 - region.x1) / 100) * img.naturalWidth;
+      const sh = ((region.y2 - region.y1) / 100) * img.naturalHeight;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(sw));
+      canvas.height = Math.max(1, Math.round(sh));
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => reject(new Error("Failed to load image for cropping"));
+    img.src = imageUrl;
+  });
+}
+
 const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
   const [selectedFigureIndex, setSelectedFigureIndex] = useState<number | null>(null);
   const [customFigure, setCustomFigure] = useState<Figure | null>(null);
