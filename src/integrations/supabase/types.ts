@@ -14,7 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      paintings: {
+        Row: {
+          artist: string
+          created_at: string | null
+          date: string | null
+          figures: Json | null
+          id: string
+          image_path: string
+          painting_overview: string | null
+          title: string
+        }
+        Insert: {
+          artist: string
+          created_at?: string | null
+          date?: string | null
+          figures?: Json | null
+          id?: string
+          image_path: string
+          painting_overview?: string | null
+          title: string
+        }
+        Update: {
+          artist?: string
+          created_at?: string | null
+          date?: string | null
+          figures?: Json | null
+          id?: string
+          image_path?: string
+          painting_overview?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
