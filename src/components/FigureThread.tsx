@@ -14,6 +14,8 @@ interface FigureThreadProps {
   figure: Figure;
   onClose: () => void;
   voice: SpeechSynthesisVoice | null;
+  voices: SpeechSynthesisVoice[];
+  onVoiceChange: (voice: SpeechSynthesisVoice) => void;
 }
 
 type PlayState = "idle" | "playing" | "paused";
