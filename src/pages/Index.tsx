@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import * as pdfjsLib from "pdfjs-dist";
 import UploadScreen from "@/components/UploadScreen";
@@ -25,6 +26,7 @@ const pdfToBase64Image = async (file: File): Promise<string> => {
 };
 
 const Index = () => {
+  const navigate = useNavigate();
   const [state, setState] = useState<AppState>("upload");
   const [imageUrl, setImageUrl] = useState<string>("");
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -58,8 +60,36 @@ const Index = () => {
       if (error) throw error;
       if (!data || data.error) throw new Error(data?.error || "Analysis failed");
 
-      setAnalysis(data as AnalysisResult);
+      const analysisResult = data as AnalysisResult;
+      setAnalysis(analysisResult);
       setState("result");
+
+      // Save to database in background
+      try {
+        const ext = file.name.split(".").pop() || "png";
+        const filePath = `${crypto.randomUUID()}.${ext}`;
+
+        let uploadFile = file;
+        if (file.type === "application/pdf") {
+          // Convert the base64 data URL to a blob for storage
+          const res = await fetch(base64);
+          const blob = await res.blob();
+          uploadFile = new File([blob], `${filePath}`, { type: "image/png" });
+        }
+
+        await supabase.storage.from("paintings").upload(filePath, uploadFile);
+
+        await (supabase.from("paintings" as any) as any).insert({
+          title: analysisResult.title,
+          artist: analysisResult.artist,
+          date: analysisResult.date,
+          painting_overview: analysisResult.paintingOverview,
+          figures: analysisResult.figures,
+          image_path: filePath,
+        });
+      } catch (saveErr) {
+        console.error("Failed to save painting:", saveErr);
+      }
     } catch (e: any) {
       console.error("Analysis error:", e);
       setErrorMsg(
