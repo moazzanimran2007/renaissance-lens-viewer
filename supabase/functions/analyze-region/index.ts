@@ -52,7 +52,7 @@ You MUST respond by calling the analyze_region tool.
               { type: "image_url", image_url: { url: image } },
               {
                 type: "text",
-                text: `I clicked at position (${x}%, ${y}%) on this painting. What is at or near that spot? Analyze this specific area in detail. Call the analyze_region tool with your findings.`,
+                text: "This is a cropped section from a painting. Analyze exactly what you see in this image. Call the analyze_region tool with your findings.",
               },
             ],
           },
