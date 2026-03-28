@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { AnalysisResult } from "@/types/analysis";
 import FigureMarker from "./FigureMarker";
 import FigurePanel from "./FigurePanel";
+import AudioWalkthrough from "./AudioWalkthrough";
+import { useAudioWalkthrough } from "@/hooks/useAudioWalkthrough";
 
 interface PaintingViewProps {
   imageUrl: string;
@@ -12,10 +14,10 @@ interface PaintingViewProps {
 const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
   const [selectedFigureIndex, setSelectedFigureIndex] = useState<number | null>(null);
   const imgRef = useRef<HTMLDivElement>(null);
+  const walkthrough = useAudioWalkthrough(analysis);
 
   return (
     <div className="min-h-screen parchment-texture">
-      {/* Header */}
       <header className="text-center pt-10 pb-6 px-6">
         <h1 className="font-display text-3xl md:text-4xl font-semibold text-walnut">
           {analysis.title}
@@ -25,7 +27,6 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
         </p>
       </header>
 
-      {/* Painting with markers */}
       <div className="flex justify-center px-4 mb-12">
         <div ref={imgRef} className="relative inline-block max-w-[80vw]">
           <img
@@ -38,12 +39,12 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
               key={i}
               figure={figure}
               onClick={() => setSelectedFigureIndex(i)}
+              isActive={walkthrough.activeFigureIndex === i}
             />
           ))}
         </div>
       </div>
 
-      {/* Overview */}
       <section className="max-w-3xl mx-auto px-6 pb-16">
         <h2 className="font-display text-2xl md:text-3xl font-semibold text-walnut mb-6">
           About This Work
@@ -68,13 +69,22 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
         </div>
       </section>
 
-      {/* Figure panel */}
       {selectedFigureIndex !== null && (
         <FigurePanel
           figure={analysis.figures[selectedFigureIndex]}
           onClose={() => setSelectedFigureIndex(null)}
         />
       )}
+
+      <AudioWalkthrough
+        state={walkthrough.state}
+        currentLabel={walkthrough.currentLabel}
+        currentSectionIndex={walkthrough.currentSectionIndex}
+        totalSections={walkthrough.totalSections}
+        onPlay={walkthrough.play}
+        onPause={walkthrough.pause}
+        onStop={walkthrough.stop}
+      />
     </div>
   );
 };
