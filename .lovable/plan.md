@@ -1,25 +1,36 @@
 
 
-## Add PDF and AVIF Upload Support
+## Expanded Figure Stories + Audio Walkthrough
 
-**What changes:**
+### What changes
 
-1. **`src/components/UploadScreen.tsx`** — Update the file type filter to accept `image/avif` and `application/pdf`, and update the label text to include "PDF, AVIF".
+**1. Richer figure descriptions from AI**
 
-2. **`src/pages/Index.tsx`** — For PDF files, convert the first page to an image before sending to the AI. This requires rendering the PDF to a canvas using `pdfjs-dist`.
+Update the edge function prompt to request much more detail per figure: full biography, historical significance, role in the painting, relationships to other figures, and relevant anecdotes. Change the `description` field from "2-3 sentences" to "3-5 rich paragraphs covering their life, significance, and role in the composition."
 
-3. **Install `pdfjs-dist`** — For client-side PDF-to-image conversion.
+**Files:** `supabase/functions/analyze-painting/index.ts` (prompt + tool schema)
 
-4. **`supabase/functions/analyze-painting/index.ts`** — No changes needed; it already receives base64 image data.
+**2. Updated Figure type and panel UI**
 
-**Flow for AVIF:** Works identically to JPG/PNG/WEBP — browsers that support AVIF will render it natively, and `FileReader.readAsDataURL` handles it.
+- Expand the `Figure` interface: add `biography` (string, multi-paragraph) alongside the existing short `description`
+- Redesign `FigurePanel` to display the full biography with paragraphs, decorative section dividers, and better typography for long-form reading
 
-**Flow for PDF:** 
-- Load the PDF using `pdfjs-dist`
-- Render page 1 to a canvas
-- Convert canvas to base64 PNG
-- Send that to the edge function as usual
-- Preview shows the rendered first page
+**Files:** `src/types/analysis.ts`, `src/components/FigurePanel.tsx`
 
-**Files modified:** `UploadScreen.tsx`, `Index.tsx`, `package.json`
+**3. Audio walkthrough using browser TTS**
+
+- Add a floating "Audio Walkthrough" button on the `PaintingView` page
+- When activated, it narrates: painting title/artist → painting overview → each figure's name and biography, sequentially
+- Uses the browser's built-in `SpeechSynthesis` API (no API key needed)
+- Controls: Play/Pause/Stop, with a progress indicator showing which section is being read (e.g., "Reading about Virgin Mary...")
+- Highlights the corresponding figure marker while its bio is being narrated
+- Create a custom hook `useAudioWalkthrough` to manage the speech queue and state
+
+**Files:** `src/hooks/useAudioWalkthrough.ts` (new), `src/components/AudioWalkthrough.tsx` (new), `src/components/PaintingView.tsx` (integrate button + active figure highlighting)
+
+### Technical details
+
+- **AI prompt change:** The figure description schema changes from `"2-3 sentences"` to a much longer `biography` field requesting full historical context, anecdotes, dates, and significance. The short `description` remains for the tooltip/marker hover.
+- **Browser TTS:** Uses `window.speechSynthesis.speak()` with `SpeechSynthesisUtterance`. The walkthrough builds a queue of utterances (overview, then each figure) and plays them sequentially via the `onend` event. Supports pause/resume natively.
+- **No new dependencies or API keys required.**
 
