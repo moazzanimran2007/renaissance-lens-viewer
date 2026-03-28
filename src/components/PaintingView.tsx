@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { AnalysisResult } from "@/types/analysis";
 import FigureMarker from "./FigureMarker";
-import FigurePanel from "./FigurePanel";
+import FigureThread from "./FigureThread";
 import AudioWalkthrough from "./AudioWalkthrough";
 import { useAudioWalkthrough } from "@/hooks/useAudioWalkthrough";
 import { useTTSVoices } from "@/hooks/useTTSVoices";
@@ -72,7 +72,7 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
       </section>
 
       {selectedFigureIndex !== null && (
-        <FigurePanel
+        <FigureThread
           figure={analysis.figures[selectedFigureIndex]}
           onClose={() => setSelectedFigureIndex(null)}
           voice={selectedVoice}
