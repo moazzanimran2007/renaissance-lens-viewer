@@ -130,6 +130,81 @@
   font-family: 'Lora', serif;
 }
 
+/* User message */
+.aui-user-message {
+  display: flex;
+  justify-content: flex-end;
+  animation: fade-up 0.3s ease-out;
+}
+
+.aui-user-message-content {
+  max-width: 80%;
+  background: hsl(var(--gold) / 0.12);
+  border: 1px solid hsl(var(--gold) / 0.3);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  font-family: 'Lora', serif;
+}
+
+/* Composer */
+.aui-composer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid hsl(var(--gold) / 0.25);
+  background: hsl(var(--parchment));
+}
+
+.aui-composer-input {
+  flex: 1;
+  background: hsl(var(--parchment-dark));
+  border: 1px solid hsl(var(--gold) / 0.3);
+  border-radius: var(--radius);
+  padding: 0.625rem 0.875rem;
+  font-family: 'Lora', serif;
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.aui-composer-input:focus {
+  border-color: hsl(var(--gold) / 0.6);
+}
+
+.aui-composer-input::placeholder {
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+.aui-composer-input:disabled {
+  opacity: 0.6;
+}
+
+.aui-composer-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius);
+  background: hsl(var(--gold) / 0.2);
+  border: 1px solid hsl(var(--gold) / 0.4);
+  color: hsl(var(--walnut));
+  transition: background 0.2s, opacity 0.2s;
+  cursor: pointer;
+}
+
+.aui-composer-send:hover:not(:disabled) {
+  background: hsl(var(--gold) / 0.35);
+}
+
+.aui-composer-send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 @keyframes sonar {
   0% {
     transform: scale(1);
