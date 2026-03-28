@@ -17,10 +17,10 @@ const Painting = () => {
 
     const load = async () => {
       const { data, error } = await supabase
-        .from("paintings")
+        .from("paintings" as any)
         .select("*")
         .eq("id", id)
-        .single();
+        .single() as { data: any; error: any };
 
       if (error || !data) {
         navigate("/gallery");

@@ -19,10 +19,10 @@ const Gallery = () => {
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase
-        .from("paintings")
+        .from("paintings" as any)
         .select("id, title, artist, date, image_path, created_at")
         .order("created_at", { ascending: false });
-      if (data) setPaintings(data);
+      if (data) setPaintings(data as any);
       setLoading(false);
     };
     load();
