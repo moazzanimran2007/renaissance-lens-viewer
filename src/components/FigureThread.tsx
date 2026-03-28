@@ -14,6 +14,8 @@ interface FigureThreadProps {
   figure: Figure;
   onClose: () => void;
   voice: SpeechSynthesisVoice | null;
+  voices: SpeechSynthesisVoice[];
+  onVoiceChange: (voice: SpeechSynthesisVoice) => void;
 }
 
 type PlayState = "idle" | "playing" | "paused";
@@ -214,7 +216,7 @@ async function streamFigureChat({
   onDone();
 }
 
-const FigureThread = ({ figure, onClose, voice }: FigureThreadProps) => {
+const FigureThread = ({ figure, onClose, voice, voices, onVoiceChange }: FigureThreadProps) => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [playState, setPlayState] = useState<PlayState>("idle");
@@ -361,56 +363,74 @@ const FigureThread = ({ figure, onClose, voice }: FigureThreadProps) => {
           </span>
 
           {/* TTS Controls */}
-          <div className="flex items-center gap-2">
-            {playState === "idle" && (
-              <button
-                onClick={play}
-                className="flex items-center gap-2 px-4 py-2 rounded-sm bg-gold/15 text-walnut border border-gold/30 hover:bg-gold/25 transition-colors font-body text-sm"
+          <div className="flex flex-col gap-2">
+            {voices.length > 1 && (
+              <select
+                value={voice?.name || ""}
+                onChange={(e) => {
+                  const v = voices.find((x) => x.name === e.target.value);
+                  if (v) onVoiceChange(v);
+                }}
+                className="w-full text-xs font-body bg-parchment/80 border border-gold/30 rounded-sm px-2 py-1.5 text-walnut focus:outline-none focus:border-gold/60"
               >
-                <Volume2 className="w-4 h-4" />
-                Listen to Story
-              </button>
+                {voices.map((v) => (
+                  <option key={v.name} value={v.name}>
+                    {v.name} {v.lang ? `(${v.lang})` : ""}
+                  </option>
+                ))}
+              </select>
             )}
-            {playState === "playing" && (
-              <>
-                <button
-                  onClick={pause}
-                  className="flex items-center gap-2 px-4 py-2 rounded-sm bg-gold/15 text-walnut border border-gold/30 hover:bg-gold/25 transition-colors font-body text-sm"
-                >
-                  <Pause className="w-4 h-4" />
-                  Pause
-                </button>
-                <button
-                  onClick={stop}
-                  className="flex items-center gap-2 px-3 py-2 rounded-sm text-muted-foreground hover:text-foreground transition-colors font-body text-sm"
-                >
-                  <Square className="w-3.5 h-3.5" />
-                </button>
-                <span className="text-xs text-gold/70 font-body italic ml-1 animate-pulse">
-                  Reading…
-                </span>
-              </>
-            )}
-            {playState === "paused" && (
-              <>
+            <div className="flex items-center gap-2">
+              {playState === "idle" && (
                 <button
                   onClick={play}
                   className="flex items-center gap-2 px-4 py-2 rounded-sm bg-gold/15 text-walnut border border-gold/30 hover:bg-gold/25 transition-colors font-body text-sm"
                 >
                   <Volume2 className="w-4 h-4" />
-                  Resume
+                  Listen to Story
                 </button>
-                <button
-                  onClick={stop}
-                  className="flex items-center gap-2 px-3 py-2 rounded-sm text-muted-foreground hover:text-foreground transition-colors font-body text-sm"
-                >
-                  <Square className="w-3.5 h-3.5" />
-                </button>
-                <span className="text-xs text-muted-foreground font-body italic ml-1">
-                  Paused
-                </span>
-              </>
-            )}
+              )}
+              {playState === "playing" && (
+                <>
+                  <button
+                    onClick={pause}
+                    className="flex items-center gap-2 px-4 py-2 rounded-sm bg-gold/15 text-walnut border border-gold/30 hover:bg-gold/25 transition-colors font-body text-sm"
+                  >
+                    <Pause className="w-4 h-4" />
+                    Pause
+                  </button>
+                  <button
+                    onClick={stop}
+                    className="flex items-center gap-2 px-3 py-2 rounded-sm text-muted-foreground hover:text-foreground transition-colors font-body text-sm"
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-xs text-gold/70 font-body italic ml-1 animate-pulse">
+                    Reading…
+                  </span>
+                </>
+              )}
+              {playState === "paused" && (
+                <>
+                  <button
+                    onClick={play}
+                    className="flex items-center gap-2 px-4 py-2 rounded-sm bg-gold/15 text-walnut border border-gold/30 hover:bg-gold/25 transition-colors font-body text-sm"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    Resume
+                  </button>
+                  <button
+                    onClick={stop}
+                    className="flex items-center gap-2 px-3 py-2 rounded-sm text-muted-foreground hover:text-foreground transition-colors font-body text-sm"
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-xs text-muted-foreground font-body italic ml-1">
+                    Paused
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

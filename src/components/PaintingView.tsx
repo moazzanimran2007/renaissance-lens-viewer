@@ -76,6 +76,8 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
           figure={analysis.figures[selectedFigureIndex]}
           onClose={() => setSelectedFigureIndex(null)}
           voice={selectedVoice}
+          voices={voices}
+          onVoiceChange={setSelectedVoice}
         />
       )}
 
