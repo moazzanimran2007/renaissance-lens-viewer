@@ -12,7 +12,7 @@ const UploadScreen = ({ onAnalyze }: UploadScreenProps) => {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleFile = useCallback((f: File) => {
-    if (!f.type.match(/^image\/(jpeg|png|webp)$/)) return;
+    if (!f.type.match(/^image\/(jpeg|png|webp|avif)$/) && f.type !== "application/pdf") return;
     setFile(f);
     const url = URL.createObjectURL(f);
     setPreview(url);
@@ -54,7 +54,7 @@ const UploadScreen = ({ onAnalyze }: UploadScreenProps) => {
             onClick={() => {
               const input = document.createElement("input");
               input.type = "file";
-              input.accept = "image/jpeg,image/png,image/webp";
+              input.accept = "image/jpeg,image/png,image/webp,image/avif,application/pdf";
               input.onchange = (e) => {
                 const f = (e.target as HTMLInputElement).files?.[0];
                 if (f) handleFile(f);
@@ -67,7 +67,7 @@ const UploadScreen = ({ onAnalyze }: UploadScreenProps) => {
               Drag & drop a painting here
             </p>
             <p className="font-body text-sm text-muted-foreground mt-2">
-              or click to browse · JPG, PNG, WEBP
+              or click to browse · JPG, PNG, WEBP, AVIF, PDF
             </p>
           </div>
         ) : (
