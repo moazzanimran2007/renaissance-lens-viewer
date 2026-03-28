@@ -1,10 +1,13 @@
-import { useState, useRef } from "react";
-import { AnalysisResult } from "@/types/analysis";
+import { useState, useRef, useCallback } from "react";
+import { AnalysisResult, Figure } from "@/types/analysis";
+import { supabase } from "@/integrations/supabase/client";
 import FigureMarker from "./FigureMarker";
 import FigureThread from "./FigureThread";
 import AudioWalkthrough from "./AudioWalkthrough";
 import { useAudioWalkthrough } from "@/hooks/useAudioWalkthrough";
 import { useTTSVoices } from "@/hooks/useTTSVoices";
+import { Loader2, Crosshair } from "lucide-react";
+import { toast } from "sonner";
 
 interface PaintingViewProps {
   imageUrl: string;
@@ -14,9 +17,79 @@ interface PaintingViewProps {
 
 const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
   const [selectedFigureIndex, setSelectedFigureIndex] = useState<number | null>(null);
+  const [customFigure, setCustomFigure] = useState<Figure | null>(null);
+  const [customClickPos, setCustomClickPos] = useState<{ x: number; y: number } | null>(null);
+  const [isAnalyzingRegion, setIsAnalyzingRegion] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
   const { voices, selectedVoice, setSelectedVoice } = useTTSVoices();
   const walkthrough = useAudioWalkthrough(analysis, selectedVoice);
+
+  const handleImageClick = useCallback(
+    async (e: React.MouseEvent<HTMLDivElement>) => {
+      // Don't trigger if clicking on a marker button
+      if ((e.target as HTMLElement).closest("button")) return;
+
+      const rect = imgRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+      const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+
+      setCustomClickPos({ x, y });
+      setSelectedFigureIndex(null);
+      setIsAnalyzingRegion(true);
+
+      try {
+        // Convert image to base64 for the edge function
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+
+        const { data, error } = await supabase.functions.invoke("analyze-region", {
+          body: {
+            image: base64,
+            x,
+            y,
+            paintingTitle: analysis.title,
+            paintingArtist: analysis.artist,
+          },
+        });
+
+        if (error) throw error;
+        if (!data || data.error) throw new Error(data?.error || "Analysis failed");
+
+        const figure: Figure = {
+          label: data.label,
+          description: data.description,
+          biography: data.biography,
+          isRealPerson: data.isRealPerson,
+          position: { x, y },
+        };
+
+        setCustomFigure(figure);
+      } catch (err: any) {
+        console.error("Region analysis error:", err);
+        toast.error("Could not analyze that area. Try again.");
+        setCustomClickPos(null);
+      } finally {
+        setIsAnalyzingRegion(false);
+      }
+    },
+    [imageUrl, analysis.title, analysis.artist]
+  );
+
+  const closeCustomFigure = useCallback(() => {
+    setCustomFigure(null);
+    setCustomClickPos(null);
+  }, []);
+
+  // Show either a pre-identified figure or a custom-selected one
+  const activeFigure = selectedFigureIndex !== null ? analysis.figures[selectedFigureIndex] : customFigure;
+  const isCustom = selectedFigureIndex === null && customFigure !== null;
 
   return (
     <div className="min-h-screen parchment-texture">
@@ -27,10 +100,18 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
         <p className="font-body text-muted-foreground mt-2 text-sm">
           {analysis.artist} · {analysis.date}
         </p>
+        <p className="font-body text-muted-foreground mt-1 text-xs flex items-center justify-center gap-1">
+          <Crosshair className="w-3 h-3" />
+          Click anywhere on the painting to analyze that area
+        </p>
       </header>
 
       <div className="flex justify-center px-4 mb-12">
-        <div ref={imgRef} className="relative inline-block max-w-[80vw]">
+        <div
+          ref={imgRef}
+          className="relative inline-block max-w-[80vw] cursor-crosshair"
+          onClick={handleImageClick}
+        >
           <img
             src={imageUrl}
             alt={analysis.title}
@@ -40,10 +121,31 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
             <FigureMarker
               key={i}
               figure={figure}
-              onClick={() => setSelectedFigureIndex(i)}
+              onClick={() => {
+                setCustomFigure(null);
+                setCustomClickPos(null);
+                setSelectedFigureIndex(i);
+              }}
               isActive={walkthrough.activeFigureIndex === i}
             />
           ))}
+          {/* Custom click marker */}
+          {customClickPos && (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: `${customClickPos.x}%`,
+                top: `${customClickPos.y}%`,
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              {isAnalyzingRegion ? (
+                <Loader2 className="w-6 h-6 text-gold animate-spin" />
+              ) : (
+                <span className="block w-[18px] h-[18px] rounded-full border-2 border-parchment bg-accent animate-pulse-gold" />
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -71,10 +173,16 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
         </div>
       </section>
 
-      {selectedFigureIndex !== null && (
+      {activeFigure && (
         <FigureThread
-          figure={analysis.figures[selectedFigureIndex]}
-          onClose={() => setSelectedFigureIndex(null)}
+          figure={activeFigure}
+          onClose={() => {
+            if (isCustom) {
+              closeCustomFigure();
+            } else {
+              setSelectedFigureIndex(null);
+            }
+          }}
           voice={selectedVoice}
           voices={voices}
           onVoiceChange={setSelectedVoice}
