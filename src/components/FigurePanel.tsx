@@ -1,4 +1,5 @@
-import { X } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { X, Volume2, Pause, Square } from "lucide-react";
 import { Figure } from "@/types/analysis";
 
 interface FigurePanelProps {
@@ -6,9 +7,50 @@ interface FigurePanelProps {
   onClose: () => void;
 }
 
+type PlayState = "idle" | "playing" | "paused";
+
 const FigurePanel = ({ figure, onClose }: FigurePanelProps) => {
   const storyText = figure.biography || figure.description;
   const paragraphs = storyText.split("\n\n").filter(Boolean);
+  const [playState, setPlayState] = useState<PlayState>("idle");
+
+  const stop = useCallback(() => {
+    window.speechSynthesis.cancel();
+    setPlayState("idle");
+  }, []);
+
+  const play = useCallback(() => {
+    if (playState === "paused") {
+      window.speechSynthesis.resume();
+      setPlayState("playing");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(
+      `${figure.label}. ${storyText.replace(/\n\n/g, " ")}`
+    );
+    utterance.rate = 0.95;
+    utterance.onend = () => setPlayState("idle");
+    utterance.onerror = (e) => {
+      if (e.error !== "interrupted" && e.error !== "canceled") {
+        setPlayState("idle");
+      }
+    };
+    window.speechSynthesis.speak(utterance);
+    setPlayState("playing");
+  }, [playState, figure.label, storyText]);
+
+  const pause = useCallback(() => {
+    window.speechSynthesis.pause();
+    setPlayState("paused");
+  }, []);
+
+  // Cleanup on unmount / figure change
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, [figure.label]);
 
   return (
     <>
@@ -47,10 +89,63 @@ const FigurePanel = ({ figure, onClose }: FigurePanelProps) => {
           {/* Full biography */}
           {figure.biography && (
             <>
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-3 mb-4">
                 <div className="h-px flex-1 bg-gold/30" />
                 <span className="font-display text-xs uppercase tracking-widest text-gold">Full Story</span>
                 <div className="h-px flex-1 bg-gold/30" />
+              </div>
+
+              {/* Audio controls */}
+              <div className="flex items-center gap-2 mb-6">
+                {playState === "idle" && (
+                  <button
+                    onClick={play}
+                    className="flex items-center gap-2 px-4 py-2 rounded-sm bg-gold/15 text-walnut border border-gold/30 hover:bg-gold/25 transition-colors font-body text-sm"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    Listen to Story
+                  </button>
+                )}
+                {playState === "playing" && (
+                  <>
+                    <button
+                      onClick={pause}
+                      className="flex items-center gap-2 px-4 py-2 rounded-sm bg-gold/15 text-walnut border border-gold/30 hover:bg-gold/25 transition-colors font-body text-sm"
+                    >
+                      <Pause className="w-4 h-4" />
+                      Pause
+                    </button>
+                    <button
+                      onClick={stop}
+                      className="flex items-center gap-2 px-3 py-2 rounded-sm text-muted-foreground hover:text-foreground transition-colors font-body text-sm"
+                    >
+                      <Square className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs text-gold/70 font-body italic ml-1 animate-pulse">
+                      Reading…
+                    </span>
+                  </>
+                )}
+                {playState === "paused" && (
+                  <>
+                    <button
+                      onClick={play}
+                      className="flex items-center gap-2 px-4 py-2 rounded-sm bg-gold/15 text-walnut border border-gold/30 hover:bg-gold/25 transition-colors font-body text-sm"
+                    >
+                      <Volume2 className="w-4 h-4" />
+                      Resume
+                    </button>
+                    <button
+                      onClick={stop}
+                      className="flex items-center gap-2 px-3 py-2 rounded-sm text-muted-foreground hover:text-foreground transition-colors font-body text-sm"
+                    >
+                      <Square className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs text-muted-foreground font-body italic ml-1">
+                      Paused
+                    </span>
+                  </>
+                )}
               </div>
 
               {paragraphs.map((para, i) => (
