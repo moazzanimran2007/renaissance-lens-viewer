@@ -29,10 +29,17 @@ serve(async (req) => {
 
 You MUST respond by calling the analyze_painting tool with your analysis. Do NOT respond with plain text.
 
+CRITICAL RULES FOR FIGURE IDENTIFICATION:
+- ONLY identify figures you can actually SEE in the image. Do NOT list figures you expect to be present based on the painting's title or iconographic tradition.
+- If the image is cropped or partial, only describe what is visible.
+- For partially visible figures (e.g., only a face edge is showing), mark them but note they are partially visible in the description.
+- If you can only see 2 figures, only return 2 figures. Never fabricate or assume figures that are not visually present.
+- Base your identification strictly on visual evidence in the uploaded image, not on art-historical knowledge of what "should" be there.
+
 Instructions:
 - Identify the painting: title, artist, approximate date
 - Describe the scene: narrative, symbolism, religious/mythological context
-- Identify ALL notable figures (real historical people AND allegorical/fictional characters)
+- Identify ALL notable figures that are VISUALLY PRESENT (real historical people AND allegorical/fictional characters)
 - For each figure, estimate their x,y position as a percentage of image dimensions (0-100)
 - For each figure, write a SHORT description (1-2 sentences for tooltip)
 - For each figure, write a DETAILED biography: 3-5 rich paragraphs covering their full life story, historical significance, role in the painting, relationships to other figures, famous anecdotes, birth/death dates if known, and why the artist chose to depict them. Use double newlines between paragraphs. Be as thorough as a museum docent giving a private tour.
