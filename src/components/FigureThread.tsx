@@ -94,6 +94,7 @@ function ThreadContent() {
         <ThreadPrimitive.Messages
           components={{
             AssistantMessage,
+            UserMessage: () => null,
           }}
         />
       </ThreadPrimitive.Viewport>
@@ -143,6 +144,7 @@ const FigureThread = ({ figure, onClose, voice }: FigureThreadProps) => {
     messages: threadMessages,
     isRunning,
     onNew: async () => {},
+    convertMessage: (msg) => msg,
   });
 
   // TTS controls
