@@ -23,21 +23,18 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const boundsDesc = regionBounds
-      ? `The user selected a rectangular region from (${regionBounds.x1}%, ${regionBounds.y1}%) to (${regionBounds.x2}%, ${regionBounds.y2}%) of the image. The center is at (${x}%, ${y}%).`
-      : `The user clicked at position (${x}%, ${y}%) from the top-left corner.`;
+    const systemPrompt = `You are an expert Renaissance art historian. The image you are seeing is a CROPPED SECTION from a larger painting. It shows ONLY the area the user selected.
+${paintingTitle ? `The full painting is "${paintingTitle}" by ${paintingArtist || "unknown artist"}.` : ""}
 
-    const systemPrompt = `You are an expert Renaissance art historian. ${boundsDesc}
-${paintingTitle ? `The painting is "${paintingTitle}" by ${paintingArtist || "unknown artist"}.` : ""}
+CRITICAL: Analyze ONLY what you can actually see in this cropped image. Do NOT guess or assume what might be in other parts of the painting. If the cropped area shows:
+- A figure: identify them based on visual evidence only and provide a detailed biography
+- An object, symbol, or architectural element: explain its significance and iconographic meaning
+- Background, landscape, or empty space: describe what is visible — colors, textures, brushwork, composition choices
+- A partial or unclear element: describe what you see honestly, noting it may be partially cropped
 
-Analyze what is at or near that position in the image. You MUST respond by calling the analyze_region tool.
+Do NOT hallucinate figures or elements that are not visible in this specific crop. Be scholarly but honest about what the image contains.
 
-Rules:
-- Focus on the area around the clicked position
-- If there's a figure there, identify them and provide a detailed biography
-- If it's an object, architectural element, landscape, or symbolic detail, explain its significance
-- If nothing notable is at that exact spot, describe the nearest interesting element
-- Be scholarly but engaging`;
+You MUST respond by calling the analyze_region tool.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -55,7 +52,7 @@ Rules:
               { type: "image_url", image_url: { url: image } },
               {
                 type: "text",
-                text: `I clicked at position (${x}%, ${y}%) on this painting. What is at or near that spot? Analyze this specific area in detail. Call the analyze_region tool with your findings.`,
+                text: "This is a cropped section from a painting. Analyze exactly what you see in this image. Call the analyze_region tool with your findings.",
               },
             ],
           },
