@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { image, x, y, paintingTitle, paintingArtist } = await req.json();
+    const { image, x, y, regionBounds, paintingTitle, paintingArtist } = await req.json();
     if (!image || x == null || y == null) {
       return new Response(
         JSON.stringify({ error: "Missing image or coordinates" }),
@@ -23,7 +23,11 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are an expert Renaissance art historian. The user has clicked on a specific area of a painting at position (${x}%, ${y}%) from the top-left corner.
+    const boundsDesc = regionBounds
+      ? `The user selected a rectangular region from (${regionBounds.x1}%, ${regionBounds.y1}%) to (${regionBounds.x2}%, ${regionBounds.y2}%) of the image. The center is at (${x}%, ${y}%).`
+      : `The user clicked at position (${x}%, ${y}%) from the top-left corner.`;
+
+    const systemPrompt = `You are an expert Renaissance art historian. ${boundsDesc}
 ${paintingTitle ? `The painting is "${paintingTitle}" by ${paintingArtist || "unknown artist"}.` : ""}
 
 Analyze what is at or near that position in the image. You MUST respond by calling the analyze_region tool.
