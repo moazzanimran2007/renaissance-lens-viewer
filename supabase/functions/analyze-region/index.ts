@@ -34,7 +34,7 @@ CRITICAL: Analyze ONLY what you can actually see in this cropped image. Do NOT g
 
 Do NOT hallucinate figures or elements that are not visible in this specific crop. Be scholarly but honest about what the image contains.
 
-You MUST respond by calling the analyze_region tool.
+You MUST respond by calling the analyze_region tool.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
