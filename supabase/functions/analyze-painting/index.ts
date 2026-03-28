@@ -89,7 +89,11 @@ Be detailed, scholarly, and engaging. The biography for each figure should read 
                         label: { type: "string", description: "Name or role of the figure" },
                         description: {
                           type: "string",
-                          description: "2-3 sentences about who they are and their role in this painting",
+                          description: "1-2 short sentences for tooltip display",
+                        },
+                        biography: {
+                          type: "string",
+                          description: "3-5 rich paragraphs covering the figure's full life story, historical significance, role in this painting, relationships to other figures, famous anecdotes, birth/death dates, and why the artist depicted them. Separate paragraphs with double newlines.",
                         },
                         isRealPerson: { type: "boolean" },
                         position: {
@@ -101,7 +105,7 @@ Be detailed, scholarly, and engaging. The biography for each figure should read 
                           required: ["x", "y"],
                         },
                       },
-                      required: ["label", "description", "isRealPerson", "position"],
+                      required: ["label", "description", "biography", "isRealPerson", "position"],
                     },
                   },
                 },
