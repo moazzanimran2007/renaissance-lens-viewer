@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, Volume2, Pause, Square } from "lucide-react";
+import { X, Volume2, Pause, Square, Send } from "lucide-react";
 import { Figure } from "@/types/analysis";
 import {
   AssistantRuntimeProvider,
@@ -8,6 +8,7 @@ import {
   MessagePrimitive,
   type ThreadMessageLike,
 } from "@assistant-ui/react";
+import { toast } from "sonner";
 
 interface FigureThreadProps {
   figure: Figure;
@@ -17,10 +18,13 @@ interface FigureThreadProps {
 
 type PlayState = "idle" | "playing" | "paused";
 
-interface StoryMessage {
+interface ChatMessage {
   id: string;
+  role: "assistant" | "user";
   text: string;
 }
+
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figure-chat`;
 
 const QuillAvatar = () => (
   <div className="aui-avatar">
@@ -39,29 +43,18 @@ const QuillAvatar = () => (
   </div>
 );
 
-function buildMessages(figure: Figure): StoryMessage[] {
-  const msgs: StoryMessage[] = [];
-
-  msgs.push({
-    id: "intro",
-    text: `Ah, let me tell you about **${figure.label}**.\n\n${figure.description}`,
-  });
-
-  msgs.push({
-    id: "type",
-    text: figure.isRealPerson
+function buildStoryText(figure: Figure): string {
+  const parts: string[] = [];
+  parts.push(`**${figure.label}** — ${figure.description}`);
+  parts.push(
+    figure.isRealPerson
       ? `This is a **historical person** — a real figure from history whose life and deeds have been recorded across centuries of scholarship.`
-      : `This is an **allegorical figure** — a symbolic representation embodying an idea, virtue, or concept rather than a specific historical individual.`,
-  });
-
+      : `This is an **allegorical figure** — a symbolic representation embodying an idea, virtue, or concept rather than a specific historical individual.`
+  );
   if (figure.biography) {
-    const paragraphs = figure.biography.split("\n\n").filter(Boolean);
-    paragraphs.forEach((para, i) => {
-      msgs.push({ id: `bio-${i}`, text: para });
-    });
+    parts.push(figure.biography);
   }
-
-  return msgs;
+  return parts.join("\n\n");
 }
 
 const AssistantMessage = () => (
@@ -71,15 +64,20 @@ const AssistantMessage = () => (
       <MessagePrimitive.Content
         components={{
           Text: ({ text }) => (
-            <p
-              className="font-body text-foreground leading-[1.85] text-[15px]"
-              dangerouslySetInnerHTML={{
-                __html: text.replace(
-                  /\*\*(.*?)\*\*/g,
-                  '<strong class="text-walnut">$1</strong>'
-                ),
-              }}
-            />
+            <div className="font-body text-foreground leading-[1.85] text-[15px]">
+              {text.split("\n\n").map((para, i) => (
+                <p
+                  key={i}
+                  className="mb-3 last:mb-0"
+                  dangerouslySetInnerHTML={{
+                    __html: para.replace(
+                      /\*\*(.*?)\*\*/g,
+                      '<strong class="text-walnut">$1</strong>'
+                    ),
+                  }}
+                />
+              ))}
+            </div>
           ),
         }}
       />
@@ -87,65 +85,212 @@ const AssistantMessage = () => (
   </MessagePrimitive.Root>
 );
 
-function ThreadContent() {
+const UserMessage = () => (
+  <MessagePrimitive.Root className="aui-user-message">
+    <div className="aui-user-message-content">
+      <MessagePrimitive.Content
+        components={{
+          Text: ({ text }) => (
+            <p className="font-body text-foreground text-[15px]">{text}</p>
+          ),
+        }}
+      />
+    </div>
+  </MessagePrimitive.Root>
+);
+
+function ThreadContent({ onSubmit, isStreaming, figureLabel }: {
+  onSubmit: (text: string) => void;
+  isStreaming: boolean;
+  figureLabel: string;
+}) {
+  const [input, setInput] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = input.trim();
+    if (!trimmed || isStreaming) return;
+    onSubmit(trimmed);
+    setInput("");
+  };
+
   return (
     <ThreadPrimitive.Root className="aui-thread">
       <ThreadPrimitive.Viewport className="aui-thread-viewport">
         <ThreadPrimitive.Messages
           components={{
             AssistantMessage,
-            UserMessage: () => null,
+            UserMessage,
           }}
         />
       </ThreadPrimitive.Viewport>
+      <form onSubmit={handleSubmit} className="aui-composer">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={`Ask about ${figureLabel}...`}
+          className="aui-composer-input"
+          disabled={isStreaming}
+        />
+        <button
+          type="submit"
+          disabled={!input.trim() || isStreaming}
+          className="aui-composer-send"
+          aria-label="Send message"
+        >
+          <Send className="w-4 h-4" />
+        </button>
+      </form>
     </ThreadPrimitive.Root>
   );
 }
 
-const FigureThread = ({ figure, onClose, voice }: FigureThreadProps) => {
-  const allMessages = useRef(buildMessages(figure));
-  const [visibleMessages, setVisibleMessages] = useState<StoryMessage[]>([]);
-  const [isRunning, setIsRunning] = useState(true);
-  const [playState, setPlayState] = useState<PlayState>("idle");
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+async function streamFigureChat({
+  messages,
+  figureContext,
+  onDelta,
+  onDone,
+  onError,
+}: {
+  messages: { role: string; content: string }[];
+  figureContext: { label: string; description: string; biography: string; isRealPerson: boolean };
+  onDelta: (text: string) => void;
+  onDone: () => void;
+  onError: (msg: string) => void;
+}) {
+  const resp = await fetch(CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({ messages, figureContext }),
+  });
 
-  // Stagger message reveal
-  useEffect(() => {
-    const msgs = buildMessages(figure);
-    allMessages.current = msgs;
-    setVisibleMessages([]);
-    setIsRunning(true);
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}));
+    const msg = body.error || `Error ${resp.status}`;
+    onError(msg);
+    return;
+  }
 
-    let i = 0;
-    const reveal = () => {
-      if (i < msgs.length) {
-        setVisibleMessages((prev) => [...prev, msgs[i]!]);
-        i++;
-        timerRef.current = setTimeout(reveal, 400);
-      } else {
-        setIsRunning(false);
+  if (!resp.body) {
+    onError("No response body");
+    return;
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let newlineIndex: number;
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      let line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (line.startsWith(":") || line.trim() === "") continue;
+      if (!line.startsWith("data: ")) continue;
+      const jsonStr = line.slice(6).trim();
+      if (jsonStr === "[DONE]") {
+        onDone();
+        return;
       }
-    };
-    timerRef.current = setTimeout(reveal, 300);
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) onDelta(content);
+      } catch {
+        buffer = line + "\n" + buffer;
+        break;
+      }
+    }
+  }
 
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
+  onDone();
+}
+
+const FigureThread = ({ figure, onClose, voice }: FigureThreadProps) => {
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [playState, setPlayState] = useState<PlayState>("idle");
+  const streamingTextRef = useRef("");
+  const msgCounterRef = useRef(0);
+
+  // Initialize with the full story as a single assistant message
+  useEffect(() => {
+    const storyText = buildStoryText(figure);
+    setChatMessages([{ id: "story", role: "assistant", text: storyText }]);
+    setIsStreaming(false);
+    streamingTextRef.current = "";
+    msgCounterRef.current = 0;
   }, [figure]);
 
   // Convert to ThreadMessageLike
-  const threadMessages: ThreadMessageLike[] = visibleMessages.map((msg) => ({
-    role: "assistant" as const,
+  const threadMessages: ThreadMessageLike[] = chatMessages.map((msg) => ({
+    role: msg.role,
     id: msg.id,
     content: [{ type: "text" as const, text: msg.text }],
   }));
 
   const runtime = useExternalStoreRuntime({
     messages: threadMessages,
-    isRunning,
+    isRunning: isStreaming,
     onNew: async () => {},
     convertMessage: (msg) => msg,
   });
+
+  const handleSubmit = useCallback(
+    (text: string) => {
+      const userMsgId = `user-${++msgCounterRef.current}`;
+      const assistantMsgId = `ai-${msgCounterRef.current}`;
+
+      setChatMessages((prev) => [...prev, { id: userMsgId, role: "user", text }]);
+      setIsStreaming(true);
+      streamingTextRef.current = "";
+
+      // Build conversation history for the API (exclude the story message)
+      const apiMessages = chatMessages
+        .filter((m) => m.id !== "story")
+        .map((m) => ({ role: m.role, content: m.text }));
+      apiMessages.push({ role: "user", content: text });
+
+      const figureContext = {
+        label: figure.label,
+        description: figure.description,
+        biography: figure.biography,
+        isRealPerson: figure.isRealPerson,
+      };
+
+      streamFigureChat({
+        messages: apiMessages,
+        figureContext,
+        onDelta: (delta) => {
+          streamingTextRef.current += delta;
+          const soFar = streamingTextRef.current;
+          setChatMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.id === assistantMsgId) {
+              return prev.map((m) =>
+                m.id === assistantMsgId ? { ...m, text: soFar } : m
+              );
+            }
+            return [...prev, { id: assistantMsgId, role: "assistant", text: soFar }];
+          });
+        },
+        onDone: () => setIsStreaming(false),
+        onError: (msg) => {
+          setIsStreaming(false);
+          toast.error(msg);
+        },
+      });
+    },
+    [chatMessages, figure]
+  );
 
   // TTS controls
   const storyText = figure.biography || figure.description;
@@ -271,7 +416,11 @@ const FigureThread = ({ figure, onClose, voice }: FigureThreadProps) => {
 
         <div className="flex-1 overflow-hidden">
           <AssistantRuntimeProvider runtime={runtime}>
-            <ThreadContent />
+            <ThreadContent
+              onSubmit={handleSubmit}
+              isStreaming={isStreaming}
+              figureLabel={figure.label}
+            />
           </AssistantRuntimeProvider>
         </div>
       </div>
