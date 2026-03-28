@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { Upload } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Upload, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface UploadScreenProps {
@@ -34,9 +35,15 @@ const UploadScreen = ({ onAnalyze }: UploadScreenProps) => {
         <h1 className="font-display text-5xl md:text-7xl font-semibold text-walnut tracking-tight mb-4">
           Renaissance Lens
         </h1>
-        <p className="font-body text-lg md:text-xl text-muted-foreground mb-12 italic">
+        <p className="font-body text-lg md:text-xl text-muted-foreground mb-8 italic">
           Upload a painting. Unlock its world.
         </p>
+        <Link
+          to="/gallery"
+          className="inline-flex items-center gap-1.5 font-body text-sm text-gold hover:text-walnut transition-colors mb-8"
+        >
+          <ImageIcon className="w-4 h-4" /> View Gallery
+        </Link>
 
         {!preview ? (
           <div

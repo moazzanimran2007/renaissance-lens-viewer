@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import FigureMarker from "./FigureMarker";
 import FigureThread from "./FigureThread";
 import AudioWalkthrough from "./AudioWalkthrough";
+import RelatedWorks from "./RelatedWorks";
 import { useAudioWalkthrough } from "@/hooks/useAudioWalkthrough";
 import { useTTSVoices } from "@/hooks/useTTSVoices";
-import { Loader2, MousePointerSquareDashed } from "lucide-react";
+import { Loader2, MousePointerSquareDashed, Image as ImageIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 interface PaintingViewProps {
@@ -172,6 +174,12 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
   return (
     <div className="min-h-screen parchment-texture">
       <header className="text-center pt-10 pb-6 px-6">
+        <Link
+          to="/gallery"
+          className="inline-flex items-center gap-1 font-body text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
+        >
+          <ImageIcon className="w-4 h-4" /> Gallery
+        </Link>
         <h1 className="font-display text-3xl md:text-4xl font-semibold text-walnut">
           {analysis.title}
         </h1>
@@ -250,7 +258,15 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
             </p>
           ))}
         </div>
-        <div className="flex justify-center mt-10">
+
+        <RelatedWorks
+          title={analysis.title}
+          artist={analysis.artist}
+          date={analysis.date}
+          paintingOverview={analysis.paintingOverview}
+        />
+
+        <div className="max-w-3xl mx-auto px-6 pb-16">
           <button
             onClick={onReset}
             className="font-body text-sm text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
