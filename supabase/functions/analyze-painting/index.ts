@@ -34,10 +34,12 @@ Instructions:
 - Describe the scene: narrative, symbolism, religious/mythological context
 - Identify ALL notable figures (real historical people AND allegorical/fictional characters)
 - For each figure, estimate their x,y position as a percentage of image dimensions (0-100)
-- Write a rich 3-4 paragraph historical overview
+- For each figure, write a SHORT description (1-2 sentences for tooltip)
+- For each figure, write a DETAILED biography: 3-5 rich paragraphs covering their full life story, historical significance, role in the painting, relationships to other figures, famous anecdotes, birth/death dates if known, and why the artist chose to depict them. Use double newlines between paragraphs. Be as thorough as a museum docent giving a private tour.
+- Write a rich 3-4 paragraph historical overview of the painting itself
 - If you cannot identify the painting, still describe what you see
 
-Be detailed, scholarly, and engaging.`;
+Be detailed, scholarly, and engaging. The biography for each figure should read like a mini-essay.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

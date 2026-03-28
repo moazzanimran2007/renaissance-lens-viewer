@@ -1,6 +1,7 @@
 export interface Figure {
   label: string;
   description: string;
+  biography: string;
   isRealPerson: boolean;
   position: { x: number; y: number };
 }

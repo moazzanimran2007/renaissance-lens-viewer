@@ -7,14 +7,12 @@ interface FigurePanelProps {
 }
 
 const FigurePanel = ({ figure, onClose }: FigurePanelProps) => {
+  const storyText = figure.biography || figure.description;
+  const paragraphs = storyText.split("\n\n").filter(Boolean);
+
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-ink/30"
-        onClick={onClose}
-      />
-      {/* Panel */}
+      <div className="fixed inset-0 z-40 bg-ink/30" onClick={onClose} />
       <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md parchment-texture gold-border border-r-0 border-t-0 border-b-0 animate-slide-in-right overflow-y-auto">
         <div className="p-8">
           <button
@@ -41,9 +39,30 @@ const FigurePanel = ({ figure, onClose }: FigurePanelProps) => {
 
           <div className="w-16 h-px bg-gold/40 mb-6" />
 
-          <p className="font-body text-foreground leading-relaxed text-[15px]">
+          {/* Short description */}
+          <p className="font-body text-muted-foreground italic text-sm leading-relaxed mb-6">
             {figure.description}
           </p>
+
+          {/* Full biography */}
+          {figure.biography && (
+            <>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-px flex-1 bg-gold/30" />
+                <span className="font-display text-xs uppercase tracking-widest text-gold">Full Story</span>
+                <div className="h-px flex-1 bg-gold/30" />
+              </div>
+
+              {paragraphs.map((para, i) => (
+                <p
+                  key={i}
+                  className="font-body text-foreground leading-[1.85] text-[15px] mb-4 last:mb-0"
+                >
+                  {para}
+                </p>
+              ))}
+            </>
+          )}
         </div>
       </div>
     </>
