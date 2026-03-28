@@ -4,6 +4,7 @@ import FigureMarker from "./FigureMarker";
 import FigurePanel from "./FigurePanel";
 import AudioWalkthrough from "./AudioWalkthrough";
 import { useAudioWalkthrough } from "@/hooks/useAudioWalkthrough";
+import { useTTSVoices } from "@/hooks/useTTSVoices";
 
 interface PaintingViewProps {
   imageUrl: string;
@@ -14,7 +15,8 @@ interface PaintingViewProps {
 const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
   const [selectedFigureIndex, setSelectedFigureIndex] = useState<number | null>(null);
   const imgRef = useRef<HTMLDivElement>(null);
-  const walkthrough = useAudioWalkthrough(analysis);
+  const { voices, selectedVoice, setSelectedVoice } = useTTSVoices();
+  const walkthrough = useAudioWalkthrough(analysis, selectedVoice);
 
   return (
     <div className="min-h-screen parchment-texture">
@@ -73,6 +75,7 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
         <FigurePanel
           figure={analysis.figures[selectedFigureIndex]}
           onClose={() => setSelectedFigureIndex(null)}
+          voice={selectedVoice}
         />
       )}
 
@@ -84,6 +87,9 @@ const PaintingView = ({ imageUrl, analysis, onReset }: PaintingViewProps) => {
         onPlay={walkthrough.play}
         onPause={walkthrough.pause}
         onStop={walkthrough.stop}
+        voices={voices}
+        selectedVoice={selectedVoice}
+        onVoiceChange={setSelectedVoice}
       />
     </div>
   );

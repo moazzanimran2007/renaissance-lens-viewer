@@ -10,14 +10,13 @@ interface WalkthroughSection {
   figureIndex?: number;
 }
 
-export function useAudioWalkthrough(analysis: AnalysisResult) {
+export function useAudioWalkthrough(analysis: AnalysisResult, voice: SpeechSynthesisVoice | null) {
   const [state, setState] = useState<WalkthroughState>("idle");
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [activeFigureIndex, setActiveFigureIndex] = useState<number | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const sectionsRef = useRef<WalkthroughSection[]>([]);
 
-  // Build sections
   useEffect(() => {
     const sections: WalkthroughSection[] = [
       {
@@ -56,6 +55,7 @@ export function useAudioWalkthrough(analysis: AnalysisResult) {
     const utterance = new SpeechSynthesisUtterance(section.text);
     utterance.rate = 0.95;
     utterance.pitch = 1;
+    if (voice) utterance.voice = voice;
     utterance.onend = () => speakSection(index + 1);
     utterance.onerror = (e) => {
       if (e.error !== "interrupted" && e.error !== "canceled") {
@@ -65,7 +65,7 @@ export function useAudioWalkthrough(analysis: AnalysisResult) {
 
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
-  }, []);
+  }, [voice]);
 
   const play = useCallback(() => {
     if (state === "paused") {
@@ -90,7 +90,6 @@ export function useAudioWalkthrough(analysis: AnalysisResult) {
     setActiveFigureIndex(null);
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();

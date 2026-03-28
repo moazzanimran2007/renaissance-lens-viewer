@@ -5,11 +5,12 @@ import { Figure } from "@/types/analysis";
 interface FigurePanelProps {
   figure: Figure;
   onClose: () => void;
+  voice: SpeechSynthesisVoice | null;
 }
 
 type PlayState = "idle" | "playing" | "paused";
 
-const FigurePanel = ({ figure, onClose }: FigurePanelProps) => {
+const FigurePanel = ({ figure, onClose, voice }: FigurePanelProps) => {
   const storyText = figure.biography || figure.description;
   const paragraphs = storyText.split("\n\n").filter(Boolean);
   const [playState, setPlayState] = useState<PlayState>("idle");
@@ -30,6 +31,7 @@ const FigurePanel = ({ figure, onClose }: FigurePanelProps) => {
       `${figure.label}. ${storyText.replace(/\n\n/g, " ")}`
     );
     utterance.rate = 0.95;
+    if (voice) utterance.voice = voice;
     utterance.onend = () => setPlayState("idle");
     utterance.onerror = (e) => {
       if (e.error !== "interrupted" && e.error !== "canceled") {
@@ -38,14 +40,13 @@ const FigurePanel = ({ figure, onClose }: FigurePanelProps) => {
     };
     window.speechSynthesis.speak(utterance);
     setPlayState("playing");
-  }, [playState, figure.label, storyText]);
+  }, [playState, figure.label, storyText, voice]);
 
   const pause = useCallback(() => {
     window.speechSynthesis.pause();
     setPlayState("paused");
   }, []);
 
-  // Cleanup on unmount / figure change
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();
@@ -81,12 +82,10 @@ const FigurePanel = ({ figure, onClose }: FigurePanelProps) => {
 
           <div className="w-16 h-px bg-gold/40 mb-6" />
 
-          {/* Short description */}
           <p className="font-body text-muted-foreground italic text-sm leading-relaxed mb-6">
             {figure.description}
           </p>
 
-          {/* Full biography */}
           {figure.biography && (
             <>
               <div className="flex items-center gap-3 mb-4">
@@ -95,7 +94,6 @@ const FigurePanel = ({ figure, onClose }: FigurePanelProps) => {
                 <div className="h-px flex-1 bg-gold/30" />
               </div>
 
-              {/* Audio controls */}
               <div className="flex items-center gap-2 mb-6">
                 {playState === "idle" && (
                   <button
